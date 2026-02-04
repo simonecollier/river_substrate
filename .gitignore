@@ -1,0 +1,41 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+dist/
+build/
+*.egg-info/
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data / outputs (keep repo lightweight by default)
+substrate_output/
+tiled_tiffs/
+
+# Common large geospatial rasters
+*.tif
+*.tiff
+*.vrt
+
+# ML artifacts / weights
+*.h5
+*.npz
+models/**/weights/
+models/**/modelOut/
+
