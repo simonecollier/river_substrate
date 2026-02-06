@@ -36,8 +36,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PACKAGE_DIR = os.path.dirname(SCRIPT_DIR)
 sys.path.append(PACKAGE_DIR)
 
+# # For debug
+# from funcs_common import *
+# from class_sonObj import sonObj
+# from class_portstarObj import portstarObj
+
 from pingmapper.funcs_common import *
-from pingmapper.funcs_model import DEPTH_DETECTION_AVAILABLE
 from pingmapper.class_sonObj import sonObj
 from pingmapper.class_portstarObj import portstarObj
 
@@ -45,29 +49,10 @@ import shutil
 
 try:
     from doodleverse_utils.imports import *
-except ImportError as e:
-    import traceback
-    print('\n' + '='*80)
+except ImportError:
     print('Could not import Doodleverse Utils. Please install these packages to use PING-Mapper.')
     print('They are not needed for GhostVision. Trying to continue...')
-    print('\nDetailed error information:')
-    print('-'*80)
-    print(f'Error Type: {type(e).__name__}')
-    print(f'Error Message: {str(e)}')
-    print('-'*80)
-    traceback.print_exc()
-    print('='*80 + '\n')
-except Exception as e:
-    import traceback
-    print('\n' + '='*80)
-    print('Unexpected error while importing Doodleverse Utils.')
-    print('Detailed error information:')
-    print('-'*80)
-    print(f'Error Type: {type(e).__name__}')
-    print(f'Error Message: {str(e)}')
-    print('-'*80)
-    traceback.print_exc()
-    print('='*80 + '\n')
+    pass
 
 from scipy.signal import savgol_filter
 
@@ -116,6 +101,8 @@ def read_master_func(logfilename='',
                      mask_wc=False,
                      spdCor=False,
                      maxCrop=False,
+                     moving_window=False,
+                     window_stride=0.1,
                      USE_GPU=False,
                      remShadow=0,
                      detectDep=0,
@@ -549,14 +536,14 @@ def read_master_func(logfilename='',
         del son
 
 
-        # # If Onix, need to store self._trans in object
-        # if sonObjs[0].isOnix:
-        #     for son in sonObjs:
-        #         son._loadSonMeta()
-        #         utm_e=son.sonMetaDF.iloc[0]['utm_e']
-        #         utm_n=son.sonMetaDF.iloc[0]['utm_n']
-        #         son._getEPSG(utm_e, utm_n)
-        #     del son
+        # If Onix, need to store self._trans in object
+        if sonObjs[0].isOnix:
+            for son in sonObjs:
+                son._loadSonMeta()
+                utm_e=son.sonMetaDF.iloc[0]['utm_e']
+                utm_n=son.sonMetaDF.iloc[0]['utm_n']
+                son._getEPSG(utm_e, utm_n)
+            del son
 
 
     else:
@@ -852,7 +839,7 @@ def read_master_func(logfilename='',
                 elif (att == "inst_dep_m") and (attAvg == 0): # Automatically detect depth if no instrument depth
                     valid=False
                     invalid[son.beam+"."+att] = False
-                    detectDep=1
+                    detectDep=0#1
                 else:
                     valid=False
                     invalid[son.beam+"."+att] = False
@@ -1010,53 +997,45 @@ def read_master_func(logfilename='',
     del son
 
     chunks = np.unique(chunks).astype(int)
+
     # # Automatically estimate depth
     if detectDep > 0:
-        # Check if depth detection dependencies are available
-        if not DEPTH_DETECTION_AVAILABLE:
-            print('\n\nCannot estimate depth automatically:')
-            print('TensorFlow, Transformers, and/or Doodleverse Utils are not installed.')
-            print('These packages are required for automatic depth detection.')
-            print('Please install them using: pip install tensorflow transformers doodleverse-utils')
-            print('Skipping automatic depth estimation...\n')
-            detectDep = 0
-        else:
-            print('\n\nAutomatically estimating depth for', len(chunks), 'chunks:')
+        print('\n\nAutomatically estimating depth for', len(chunks), 'chunks:')
 
-            #Dictionary to store chunk : np.array(depth estimate)
-            psObj.portDepDetect = {}
-            psObj.starDepDetect = {}
+        #Dictionary to store chunk : np.array(depth estimate)
+        psObj.portDepDetect = {}
+        psObj.starDepDetect = {}
 
-            # Estimate depth using:
-            # Zheng et al. 2021
-            # Load model weights and configuration file
-            if detectDep == 1:
+        # Estimate depth using:
+        # Zheng et al. 2021
+        # Load model weights and configuration file
+        if detectDep == 1:
 
-                # Store configuration file and model weights
-                # These were downloaded at the beginning of the script
-                depthModelVer = 'Bedpick_Zheng2021_Segmentation_unet_v1.0'
-                psObj.configfile = os.path.join(modelDir, depthModelVer, 'config', depthModelVer+'.json')
-                psObj.weights = os.path.join(modelDir, depthModelVer, 'weights', depthModelVer+'_fullmodel.h5')
-                print('\n\tUsing Zheng et al. 2021 method. Loading model:', os.path.basename(psObj.weights))
+            # Store configuration file and model weights
+            # These were downloaded at the beginning of the script
+            depthModelVer = 'Bedpick_Zheng2021_Segmentation_unet_v1.0'
+            psObj.configfile = os.path.join(modelDir, depthModelVer, 'config', depthModelVer+'.json')
+            psObj.weights = os.path.join(modelDir, depthModelVer, 'weights', depthModelVer+'_fullmodel.h5')
+            print('\n\tUsing Zheng et al. 2021 method. Loading model:', os.path.basename(psObj.weights))
 
-            # With binary thresholding
-            elif detectDep == 2:
-                print('\n\tUsing binary thresholding...')
+        # With binary thresholding
+        elif detectDep == 2:
+            print('\n\tUsing binary thresholding...')
 
-            # Parallel estimate depth for each chunk using appropriate method
-            r = Parallel(n_jobs=np.min([len(chunks), threadCnt]))(delayed(psObj._detectDepth)(detectDep, int(chunk), USE_GPU, tileFile) for chunk in tqdm(chunks))
+        # Parallel estimate depth for each chunk using appropriate method
+        r = Parallel(n_jobs=np.min([len(chunks), threadCnt]))(delayed(psObj._detectDepth)(detectDep, int(chunk), USE_GPU, tileFile) for chunk in tqdm(chunks))
 
-            # store the depth predictions in the class
-            for ret in r:
-                psObj.portDepDetect[ret[2]] = ret[0]
-                psObj.starDepDetect[ret[2]] = ret[1]
-                del ret
-            del r
+        # store the depth predictions in the class
+        for ret in r:
+            psObj.portDepDetect[ret[2]] = ret[0]
+            psObj.starDepDetect[ret[2]] = ret[1]
+            del ret
+        del r
 
-            # Flag indicating depth autmatically estimated
-            autoBed = True
+        # Flag indicating depth autmatically estimated
+        autoBed = True
 
-            saveDepth = True
+        saveDepth = True
 
     # Don't estimate depth, use instrument depth estimate (sonar derived)
     elif detectDep == 0:
@@ -1088,34 +1067,22 @@ def read_master_func(logfilename='',
 
                 sonDF['dep_m_Method'] = 'Instrument Depth'
                 sonDF['dep_m_smth'] = False
-                sonDF['dep_m_adjBy'] = adjDep  
-
-                dep = sonDF['inst_dep_m'].to_numpy(copy=True)
-
+                sonDF['dep_m_adjBy'] = adjDep
+                
+                dep = sonDF['inst_dep_m']
                 if smthDep:
                     dep = savgol_filter(dep, 51, 3)
 
                 # Interpolate over nan's (and set zero's to nan)
                 dep[dep==0] = np.nan
-                dep = np.asarray(dep)
+                # Ensure writable array (some numpy views can be read-only)
+                dep = np.asarray(dep).copy()
                 nans = np.isnan(dep)
+                dep[nans] = np.interp(np.flatnonzero(nans), np.flatnonzero(~nans), dep[~nans])
                 
-                # Only interpolate if there are valid (non-NaN) values
-                if np.any(~nans):
-                    # There are some valid values, so we can interpolate
-                    dep[nans] = np.interp(np.flatnonzero(nans), np.flatnonzero(~nans), dep[~nans])
+                sonDF['dep_m'] = dep + adjDep
 
-                    sonDF['dep_m'] = dep + adjDep
-
-                    sonDF.to_csv(son.sonMetaFile, index=False, float_format='%.14f')
-                else:
-                    # All values are NaN - cannot interpolate
-                    print("\nWarning: All instrument depth values are NaN or zero. Cannot interpolate depth.")
-                    print("This may indicate missing depth data in the sonar file.")
-                
-                # sonDF['dep_m'] = dep + adjDep
-
-                # sonDF.to_csv(son.sonMetaFile, index=False, float_format='%.14f')
+                sonDF.to_csv(son.sonMetaFile, index=False, float_format='%.14f')
                 del sonDF, son.sonMetaDF
                 son._cleanup()
 
@@ -1466,6 +1433,83 @@ def read_master_func(logfilename='',
                 # for i in tqdm(chunks):
                 #     son._exportTilesSpd(i, tileFile=imgType, spdCor=spdCor, mask_shdw=mask_shdw, maxCrop=maxCrop)
                 #     sys.exit()
+
+                if moving_window and not spdCor:
+
+                    # Crop all images to most common range
+                    son._loadSonMeta()
+                    sDF = son.sonMetaDF
+                    
+                    rangeCnt = np.unique(sDF['ping_cnt'], return_counts=True)
+                    pingMaxi = np.argmax(rangeCnt[1])
+                    pingMax = int(rangeCnt[0][pingMaxi])
+
+                    depCnt = np.unique(sDF['dep_m'], return_counts=True)
+                    depMaxi = np.argmax(depCnt[1])
+                    depMax = int(depCnt[0][depMaxi]/sDF['pixM'][0])
+                    depMax += 50
+
+
+                    # Remove first chunk
+                    chunks.sort()
+                    chunks = chunks[1:]
+
+                    # Get types of files exported
+                    tileType = []
+                    if son.wcp:
+                        tileType.append('wcp')
+                    if son.wcm:
+                        tileType.append('wcm')
+                    if son.wcr_src:
+                        tileType.append('src')
+                    if son.wco:
+                        tileType.append('wco')
+
+                    Parallel(n_jobs= np.min([len(chunks), threadCnt]))(delayed(son._exportMovWin)(i, stride=window_stride, tileType=tileType, pingMax=pingMax, depMax=depMax) for i in tqdm(chunks))
+
+                    # son._exportMovWin(chunks, 
+                    #                   stride=window_stride, 
+                    #                   tileType=tileType)
+
+                    for t in tileType:
+                        shutil.rmtree(os.path.join(son.outDir, t))
+
+                    # Create a movie
+                    if tileFile == '.mp4' and moving_window and not spdCor:
+                        for t in tileType:
+                            inDir = os.path.join(son.outDir, t+'_mw')
+
+                            imgs = os.listdir(inDir)
+                            imgs.sort()
+
+                            frame = cv2.imread(os.path.join(inDir, imgs[0]))
+                            height, width, layers = frame.shape
+
+                            outName = '_'.join(imgs[0].split('_')[:-2])
+                            vidPath = os.path.join(inDir, outName+tileFile)
+
+                            video = cv2.VideoWriter(vidPath, cv2.VideoWriter_fourcc(*'mp4v'), 3, (width, height))
+                            for image in imgs:
+                                frame = cv2.imread(os.path.join(inDir, image))
+
+                                # Pad end
+                                if frame.shape[1] < nchunk:
+                                    n_dims = frame.ndim
+                                    if n_dims == 2:
+                                        padding = ((0,0), (0, nchunk-frame.shape[1]))
+                                    else:
+                                        padding = ((0,0), (0, nchunk-frame.shape[1]), (0,0))
+                                    frame = np.pad(frame, padding, mode='constant', constant_values=0)
+
+                                video.write(frame)
+
+                            video.release()
+
+                            # Removs
+                            for image in imgs:
+                                os.remove(os.path.join(inDir, image))
+
+                            # shutil.rmtree(os.path.join(son.outDir, t))
 
                 son._pickleSon()
 

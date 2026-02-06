@@ -233,6 +233,7 @@ def smoothTrackline(projDir='', x_offset='', y_offset='', nchunk ='', cog=True, 
 
         i = 1
         t = 0
+        # If there's only one chunk (max == 0), this loop should be skipped.
         while i <= max(chunks):
 
         # for i in chunks:
@@ -246,15 +247,16 @@ def smoothTrackline(projDir='', x_offset='', y_offset='', nchunk ='', cog=True, 
             
             if curTransect == t:
                 # Get second to last row of previous chunk
-                lastRow = sDF[sDF['chunk_id'] == i-1].iloc[-2]
+                lastRow = sDF[sDF['chunk_id'] == i-1].iloc[[-2]]
 
                 # Update current chunks first row from lastRow
-                sDF.at[curRow, "lons"] = float(lastRow["lons"])
-                sDF.at[curRow, "lats"] = float(lastRow["lats"])
-                sDF.at[curRow, "utm_es"] = float(lastRow["utm_es"])
-                sDF.at[curRow, "utm_ns"] = float(lastRow["utm_ns"])
-                sDF.at[curRow, "cog"] = float(lastRow["cog"])
-                sDF.at[curRow, "instr_heading"] = float(lastRow["instr_heading"])
+                # `lastRow[col]` is a Series (1-row df). Assign scalars, not Series.
+                sDF.at[curRow, "lons"] = lastRow["lons"].iloc[0]
+                sDF.at[curRow, "lats"] = lastRow["lats"].iloc[0]
+                sDF.at[curRow, "utm_es"] = lastRow["utm_es"].iloc[0]
+                sDF.at[curRow, "utm_ns"] = lastRow["utm_ns"].iloc[0]
+                sDF.at[curRow, "cog"] = lastRow["cog"].iloc[0]
+                sDF.at[curRow, "instr_heading"] = lastRow["instr_heading"].iloc[0]
                 # sDF.at[curRow, 'pixM'] = lastRow['pixM']
 
                 del lastRow
@@ -262,7 +264,8 @@ def smoothTrackline(projDir='', x_offset='', y_offset='', nchunk ='', cog=True, 
                 t += 1
 
             i+=1
-        del curRow, i
+        # `curRow` is only defined if the loop runs
+        del i
 
         son0.smthTrk = sDF # Store smoothed trackline coordinates in rectObj.
         

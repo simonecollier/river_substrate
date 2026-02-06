@@ -63,29 +63,10 @@ try:
     from doodleverse_utils.imports import *
     from doodleverse_utils.model_imports import *
     from doodleverse_utils.prediction_imports import *
-except ImportError as e:
-    import traceback
-    print('\n' + '='*80)
+except ImportError:
     print('Could not import Doodleverse Utils. Please install these packages to use PING-Mapper.')
     print('They are not needed for GhostVision. Trying to continue...')
-    print('\nDetailed error information:')
-    print('-'*80)
-    print(f'Error Type: {type(e).__name__}')
-    print(f'Error Message: {str(e)}')
-    print('-'*80)
-    traceback.print_exc()
-    print('='*80 + '\n')
-except Exception as e:
-    import traceback
-    print('\n' + '='*80)
-    print('Unexpected error while importing Doodleverse Utils.')
-    print('Detailed error information:')
-    print('-'*80)
-    print(f'Error Type: {type(e).__name__}')
-    print(f'Error Message: {str(e)}')
-    print('-'*80)
-    traceback.print_exc()
-    print('='*80 + '\n')
+    pass
 
 import geopandas as gpd
 
@@ -893,14 +874,6 @@ class portstarObj(object):
         --------------------
         self._depthZheng() or self._depthThreshold()
         '''
-        
-        # Check if depth detection dependencies are available
-        if not DEPTH_DETECTION_AVAILABLE:
-            raise ImportError(
-                "TensorFlow, Transformers, and/or Doodleverse Utils are not installed. "
-                "These packages are required for automatic depth detection. "
-                "Please install them using: pip install tensorflow transformers doodleverse-utils"
-            )
 
         # Open model configuration file
         with open(self.configfile) as f:
@@ -1605,8 +1578,9 @@ class portstarObj(object):
             starDF['dep_m_adjBy'] = str(adjDep / starDF['pixM']) + ' pixels'
 
         # Interpolate over nan's (and set zeros to nan)
-        portDep = portDF['dep_m'].to_numpy(copy=True)
-        starDep = starDF['dep_m'].to_numpy(copy=True)
+        # Ensure writable arrays (some numpy views can be read-only)
+        portDep = portDF['dep_m'].to_numpy().copy()
+        starDep = starDF['dep_m'].to_numpy().copy()
 
         portDep[portDep == 0] = np.nan
         starDep[starDep == 0] = np.nan
