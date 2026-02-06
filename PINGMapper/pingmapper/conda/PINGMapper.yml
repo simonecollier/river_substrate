@@ -1,0 +1,29 @@
+name: ping
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - gdal=3.9
+  - numpy
+  - git
+  - pandas
+  - geopandas
+  - pyproj<3.7.1
+  - scikit-image
+  - joblib
+  - matplotlib
+  - rasterio
+  - h5py
+  - pip
+  - pip:
+      - pingverter
+      - pingmapper
+      - pingwizard
+      - pinginstaller
+      - doodleverse_utils
+      - psutil
+      - tensorflow
+      - tf-keras
+      - opencv-python
+      - transformers<5
+      - rsa
