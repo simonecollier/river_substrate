@@ -36,6 +36,5 @@ tiled_tiffs/
 # ML artifacts / weights
 *.h5
 *.npz
-models/**/weights/
-models/**/modelOut/
+models/
 
